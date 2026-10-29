@@ -1,6 +1,6 @@
 // Port Pages JavaScript - Centralized for all 49 port pages
 
-// --- Port List Data for Dropdown ---
+/* ---------- Ports data ---------- */
 const ports = [
   "Ship Chandler Dar Es Salaam", "Ship Chandler Apapa", "Ship Chandler Onne Port Nigeria", "San Pedro Ship Supply Chandler",
   "Ship Chandler Abidjan", "Ship Chandler Freetown", "Monrovia Ship Chandler", "Ship Chandler Maputo", "Ship Chandler Matadi",
@@ -15,90 +15,162 @@ const ports = [
   "Ship Chandler Dakar", "Ship Chandler Mombasa", "Ship Chandlers Saldanha Bay", "Ship Chandler Owendo", "Ship Chandlers Richards Bay"
 ];
 
-// Populate Mega Menu
-const megaList = document.getElementById('mega-port-list');
-if (megaList) {
+const megaPorts = document.getElementById('megaPorts');
+if (megaPorts) {
   const third = Math.ceil(ports.length / 3);
-  const col1 = ports.slice(0, third);
-  const col2 = ports.slice(third, third * 2);
-  const col3 = ports.slice(third * 2);
+  const cols = [ports.slice(0, third), ports.slice(third, third * 2), ports.slice(third * 2)];
+  const titles = ['African Ports (A-D)', 'African Ports (E-M)', 'African Ports (N-Z)'];
 
-  function createPortGroup(title, items) {
-    const group = document.createElement('div');
-    group.className = 'mega-group';
-    group.innerHTML = `<h4>${title}</h4>`;
-    items.forEach(port => {
+  cols.forEach((list, i) => {
+    const col = document.createElement('div');
+    col.className = 'mega-col';
+    col.innerHTML = `<h5>${titles[i]}</h5>`;
+    list.forEach(port => {
       const a = document.createElement('a');
       a.href = `${port.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.html`;
       a.textContent = port;
-      group.appendChild(a);
+      col.appendChild(a);
     });
-    return group;
-  }
+    megaPorts.appendChild(col);
+  });
 
-  megaList.appendChild(createPortGroup('African Ports (A-D)', col1));
-  megaList.appendChild(createPortGroup('African Ports (E-M)', col2));
-  megaList.appendChild(createPortGroup('African Ports (N-Z)', col3));
+  const portSearch = document.getElementById('portSearch');
+  if (portSearch) {
+    portSearch.addEventListener('input', function (e) {
+      const q = e.target.value.toLowerCase();
+      const links = megaPorts.querySelectorAll('a');
+      const groups = megaPorts.querySelectorAll('.mega-col');
 
-  // Mega Menu Search
-  const searchInput = document.getElementById('mega-port-search');
-  if (searchInput) {
-    searchInput.addEventListener('input', function(e) {
-      const query = e.target.value.toLowerCase();
-      const allLinks = megaList.querySelectorAll('a');
-      const groups = megaList.querySelectorAll('.mega-group');
-      
-      allLinks.forEach(link => {
-        const text = link.textContent.toLowerCase();
-        link.style.display = text.includes(query) ? 'block' : 'none';
+      links.forEach(l => {
+        l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none';
       });
 
-      groups.forEach(group => {
-        const hasVisible = Array.from(group.querySelectorAll('a')).some(a => a.style.display !== 'none');
-        group.style.display = hasVisible ? 'block' : 'none';
+      groups.forEach(g => {
+        const any = Array.from(g.querySelectorAll('a')).some(a => a.style.display !== 'none');
+        g.style.display = any ? 'block' : 'none';
       });
     });
   }
 }
 
-// --- Sticky Header ---
-const header = document.querySelector('.site-header');
-window.addEventListener('scroll', () => {
-  if (window.scrollY > 20) {
-    header.classList.add('scrolled');
-  } else {
-    header.classList.remove('scrolled');
+document.addEventListener('DOMContentLoaded', function () {
+
+  /* Sticky header */
+  const masthead = document.getElementById('masthead');
+  if (masthead) {
+    window.addEventListener('scroll', () => {
+      masthead.classList.toggle('is-stuck', window.scrollY > 20);
+    });
   }
-});
 
-// --- Mobile Nav Toggle ---
-const navToggle = document.querySelector('.nav-toggle');
-const primaryNav = document.querySelector('.primary-nav');
+  /* Burger */
+  const burger = document.querySelector('.burger');
+  const navShell = document.getElementById('navShell');
 
-if (navToggle && primaryNav) {
-  navToggle.addEventListener('click', function() {
-    primaryNav.classList.toggle('open');
-    const spans = this.querySelectorAll('span');
-    if(primaryNav.classList.contains('open')) {
-      spans[0].style.transform = 'rotate(45deg) translate(5px, 5px)';
-      spans[1].style.opacity = '0';
-      spans[2].style.transform = 'rotate(-45deg) translate(5px, -5px)';
-    } else {
-      spans[0].style.transform = 'none';
-      spans[1].style.opacity = '1';
-      spans[2].style.transform = 'none';
+  if (burger && navShell && masthead) {
+    burger.addEventListener('click', function () {
+      navShell.classList.toggle('open');
+      this.classList.toggle('open');
+      masthead.classList.toggle('is-open');
+    });
+  }
+
+  /* Mobile dropdowns */
+  document.querySelectorAll('.nav-unit.has-flyout, .nav-unit.has-mega').forEach(unit => {
+    const anchor = unit.querySelector('.nav-anchor');
+    if (anchor) {
+      anchor.addEventListener('click', function (e) {
+        if (window.innerWidth <= 1024) {
+          e.preventDefault();
+          unit.classList.toggle('open');
+        }
+      });
     }
   });
-}
 
-// --- Mobile Dropdown Toggles ---
-const dropdownItems = document.querySelectorAll('.nav-item.has-dropdown');
-dropdownItems.forEach(item => {
-  const link = item.querySelector('.nav-link');
-  link.addEventListener('click', function(e) {
-    if (window.innerWidth <= 1024) {
-      e.preventDefault();
-      item.classList.toggle('open');
+  /* JS Fallback for dropdown flicker (guarantees smooth hover) */
+  const navPorts = document.getElementById('navPorts');
+  const megaMenu = document.getElementById('megaPortsMenu');
+
+  if (navPorts && megaMenu) {
+    let timeout;
+    const openMenu = () => {
+      clearTimeout(timeout);
+      megaMenu.style.opacity = '1';
+      megaMenu.style.visibility = 'visible';
+      megaMenu.style.transform = 'translateX(-50%) translateY(0)';
+    };
+    const closeMenu = () => {
+      timeout = setTimeout(() => {
+        megaMenu.style.opacity = '0';
+        megaMenu.style.visibility = 'hidden';
+        megaMenu.style.transform = 'translateX(-50%) translateY(14px)';
+      }, 100);
+    };
+
+    if (window.innerWidth > 1024) {
+      navPorts.parentElement.addEventListener('mouseenter', openMenu);
+      navPorts.parentElement.addEventListener('mouseleave', closeMenu);
+      megaMenu.addEventListener('mouseenter', openMenu);
+      megaMenu.addEventListener('mouseleave', closeMenu);
     }
-  });
+  }
+
+  /* Scroll reveal */
+  const risers = document.querySelectorAll('.rise');
+  if (risers.length > 0) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(en => {
+        if (en.isIntersecting) {
+          en.target.classList.add('in');
+          io.unobserve(en.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    risers.forEach(el => io.observe(el));
+  }
+
+  /* Horizontal TOC Active State */
+  const tocLinks = document.querySelectorAll('.port-toc-bar a');
+  const categories = document.querySelectorAll('.service-category');
+
+  if (tocLinks.length > 0 && categories.length > 0) {
+    window.addEventListener('scroll', () => {
+      let current = '';
+      const scrollPos = window.scrollY + 160;
+
+      categories.forEach(cat => {
+        const top = cat.offsetTop;
+        if (scrollPos >= top) {
+          current = cat.getAttribute('id');
+        }
+      });
+
+      tocLinks.forEach(link => {
+        link.classList.remove('active');
+        if (current && link.getAttribute('href') === `#${current}`) {
+          link.classList.add('active');
+        }
+      });
+    });
+
+    /* Smooth scroll for TOC */
+    tocLinks.forEach(link => {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        const targetId = this.getAttribute('href');
+        const targetEl = document.querySelector(targetId);
+        if (targetEl) {
+          const headerOffset = 140;
+          const elementPosition = targetEl.getBoundingClientRect().top;
+          const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+          });
+        }
+      });
+    });
+  }
 });

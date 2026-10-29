@@ -1,47 +1,73 @@
 """
 Port Pages Generator
-Generates responsive, SEO-optimized port landing pages with the new Cyan/Blue Premium theme,
-centralized CSS (assets/css/port-pages.css), matching navbar & footer from index.html (without drinks & snacks),
-schema markup, sticky TOC sidebar, and styled article content from Excel data.
+Generates modern, responsive, SEO-optimized port landing pages matching the new
+Ship Chandler Georgia theme (Georgia Blue & Red, Instrument Sans & Karla typography),
+centralized CSS (assets/css/port-pages.css), centralized JS (assets/js/port-pages.js),
+standardized port-hero.jpg image, navbar & footer matching index.html,
+schema markup (JSON-LD), horizontal tabbed TOC, and structured article content from Excel data.
 """
 
 import os
 import re
 import html
 import json
+import shutil
 import openpyxl
 
 # Configuration Paths
 REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 PORTS_DIR = os.path.join(REPO_ROOT, "ports")
 CSS_FILE = os.path.join(REPO_ROOT, "assets", "css", "port-pages.css")
+JS_FILE = os.path.join(REPO_ROOT, "assets", "js", "port-pages.js")
+IMGS_DIR = os.path.join(REPO_ROOT, "assets", "imgs")
 EXCEL_PATH = r"D:\FalconXoft Ship Chandler\Website Data\Ship_Chandler_SEO_49_Pages_FULL.xlsx"
+HERO_IMG_NAME = "port-hero.jpg"
 
-# Section heading IDs matching Table of Contents and Bissau layout
-H2_IDS = [
-    'professional-services',
-    'provisions',
-    'bonded',
-    'deck',
-    'engine',
-    'cabin',
-    'safety',
-    'electrical',
-    'chemicals',
-    'welding',
-    'spare-parts',
-    'publications',
-    'tools',
-    'technical-support',
-    'urgent',
-    'vessels',
-    'rfq',
-    'why-choose',
-    None,
-    None,
-    None,
-    None,
+# 22 Service categories metadata matching Bissau port page layout exactly
+CATEGORY_META = [
+    ("professional-services", "fas fa-ship"),
+    ("provisions", "fas fa-apple-alt"),
+    ("bonded", "fas fa-box"),
+    ("deck", "fas fa-anchor"),
+    ("engine", "fas fa-cogs"),
+    ("cabin", "fas fa-bed"),
+    ("safety", "fas fa-hard-hat"),
+    ("electrical", "fas fa-bolt"),
+    ("chemicals", "fas fa-flask"),
+    ("welding", "fas fa-fire"),
+    ("spare-parts", "fas fa-wrench"),
+    ("publications", "fas fa-book"),
+    ("tools", "fas fa-tools"),
+    ("technical-support", "fas fa-user-cog"),
+    ("urgent", "fas fa-clock"),
+    ("vessels", "fas fa-ship"),
+    ("rfq", "fas fa-file-invoice"),
+    ("why-choose", "fas fa-check-circle"),
+    ("", "fas fa-shield-alt"),
+    ("", "fas fa-handshake"),
+    ("", "fas fa-paper-plane"),
+    ("", "fas fa-hand-holding-heart"),
 ]
+
+
+def ensure_hero_image():
+    """
+    Ensures assets/imgs/port-hero.jpg exists.
+    If not, copies bg-hero.jpg to port-hero.jpg as a reliable base image.
+    Also ensures logo.png is copied to root directory if needed.
+    """
+    target_hero = os.path.join(IMGS_DIR, HERO_IMG_NAME)
+    source_hero = os.path.join(IMGS_DIR, "bg-hero.jpg")
+    if not os.path.exists(target_hero) and os.path.exists(source_hero):
+        shutil.copyfile(source_hero, target_hero)
+        print(f"[IMAGE] Created {target_hero} from {source_hero}")
+
+    # Ensure logo in root directory exists for convenience
+    root_logo = os.path.join(REPO_ROOT, "logo.png")
+    source_logo = os.path.join(IMGS_DIR, "logo.png")
+    if not os.path.exists(root_logo) and os.path.exists(source_logo):
+        shutil.copyfile(source_logo, root_logo)
+        print(f"[IMAGE] Created root {root_logo}")
 
 
 def get_clean_port_name(page_name):
@@ -50,100 +76,75 @@ def get_clean_port_name(page_name):
     e.g. 'Bissau Ship Chandler - Guinea' -> 'Bissau Port'
          'Ship Chandler Apapa' -> 'Apapa Port'
          'Ship Chandler Dar Es Salaam' -> 'Dar Es Salaam Port'
+         'Ship Chandler Onne Port Nigeria' -> 'Onne Port Nigeria'
     """
     clean = page_name
-    clean = re.sub(r'\bShip\s*Chandlers?\b', '', clean, flags=re.IGNORECASE)
-    clean = re.sub(r'\bShip\s*Supply\s*Chandler\b', '', clean, flags=re.IGNORECASE)
-    clean = re.sub(r'\bShipchandler\b', '', clean, flags=re.IGNORECASE)
+    clean = re.sub(r'\b(Ship\s*Chandlers?|Ship\s*Supply\s*Chandler|Shipchandler)\b', '', clean, flags=re.IGNORECASE)
     clean = re.sub(r'\s*-\s*.*$', '', clean).strip()
     clean = re.sub(r'\s+', ' ', clean).strip()
-    if 'port' not in clean.lower():
+    if not re.search(r'\bport\b', clean, flags=re.IGNORECASE):
         clean += ' Port'
     return clean
 
 
-def format_hero_title(h1, page_name):
+def format_hero_title(h1, page_name=None):
     """
-    Formats the H1 title with a styled <span> highlight to match Bissau's two-tone theme.
+    Formats the H1 title with an <em> highlight matching Bissau's two-tone theme.
+    e.g. 'Bissau Ship Chandler - Guinea' -> 'Bissau Ship Chandler <br><em>- Guinea</em>'
+         'Ship Chandler Dar Es Salaam' -> 'Ship Chandler <br><em>Dar Es Salaam</em>'
+         'Monrovia Ship Chandler' -> '<em>Monrovia</em> <br>Ship Chandler'
     """
+    h1 = str(h1).strip()
     if ' - ' in h1:
         parts = h1.split(' - ', 1)
-        return f"{parts[0]} <span>- {parts[1]}</span>"
+        return f"{parts[0]} <br><em>- {parts[1]}</em>"
     elif ' -' in h1:
         parts = h1.split(' -', 1)
-        return f"{parts[0]} <span>-{parts[1]}</span>"
+        return f"{parts[0]} <br><em>-{parts[1]}</em>"
 
     m = re.match(r'^(Ship\s*Chandlers?|Shipchandler)\s+(.*)$', h1, flags=re.IGNORECASE)
     if m:
-        return f"{m.group(1)} <span>{m.group(2)}</span>"
+        return f"{m.group(1)} <br><em>{m.group(2)}</em>"
 
     m2 = re.match(r'^(.*?)\s+(Ship\s*Chandlers?|Ship\s*Supply\s*Chandler)$', h1, flags=re.IGNORECASE)
     if m2:
-        return f"<span>{m2.group(1)}</span> {m2.group(2)}"
+        return f"<em>{m2.group(1)}</em> <br>{m2.group(2)}"
 
-    return h1
-
-
-def extract_and_centralize_css():
-    """
-    Extracts the CSS from bissau-ship-chandler-guinea.html if inline style block is present,
-    and writes it to assets/css/port-pages.css.
-    """
-    bissau_path = os.path.join(PORTS_DIR, "bissau-ship-chandler-guinea.html")
-    if not os.path.exists(bissau_path):
-        print(f"[CSS] Bissau template not found at {bissau_path}, skipping extraction.")
-        return
-
-    with open(bissau_path, "r", encoding="utf-8") as f:
-        bissau_html = f.read()
-
-    style_start = "<style>"
-    style_end = "</style>"
-
-    if style_start in bissau_html and style_end in bissau_html:
-        p1 = bissau_html.find(style_start)
-        p2 = bissau_html.find(style_end)
-
-        css_content = bissau_html[p1 + len(style_start):p2].strip()
-
-        os.makedirs(os.path.dirname(CSS_FILE), exist_ok=True)
-        with open(CSS_FILE, "w", encoding="utf-8") as f:
-            f.write("/* ==========================================================================\n")
-            f.write("   CENTRALIZED PORT PAGES STYLESHEET\n")
-            f.write("   Theme: Light Premium - Cyan/Blue Nautical\n")
-            f.write("   ========================================================================== */\n\n")
-            f.write(css_content + "\n")
-
-        print(f"[CSS] Centralized {len(css_content)} bytes of styles into {CSS_FILE}")
-    else:
-        print("[CSS] Master template already links to centralized CSS.")
+    return f"<em>{h1}</em>"
 
 
-def render_article_html(desc_text):
+def render_article_html(desc_text, clean_port):
     """
     Parses the Markdown description from Excel into semantic HTML
-    matching the exact structure, IDs, pill-styled lists, and spacing of the Bissau page.
+    matching the exact structure, category IDs, icons, pill lists, and CTA of the Bissau page.
     """
-    blocks = [b.strip() for b in desc_text.split('\n\n') if b.strip()]
+    blocks = [b.strip() for b in str(desc_text).split('\n\n') if b.strip()]
     lines = []
-    h2_index = 0
+    cat_idx = 0
+    in_category = False
 
     for b in blocks:
         if b.startswith('# '):
             # Skip top-level H1 (rendered in Hero section)
             continue
         elif b.startswith('## '):
-            heading_text = b[3:].strip()
-            # Clean up potential dash formatting
-            heading_text = heading_text.replace('\u2013', '–')
-            hid = H2_IDS[h2_index] if h2_index < len(H2_IDS) else None
-            h2_index += 1
-            if lines:
+            if in_category:
+                lines.append('          </div>')
                 lines.append('')
-            if hid:
-                lines.append(f'            <h2 id="{hid}">{heading_text}</h2>')
+
+            heading_text = b[3:].strip()
+            heading_text = heading_text.replace('\u2013', '–').replace('\u2014', '–')
+
+            cat_id, cat_icon = CATEGORY_META[cat_idx] if cat_idx < len(CATEGORY_META) else ("", "fas fa-ship")
+            cat_idx += 1
+
+            if cat_id:
+                lines.append(f'          <div class="service-category" id="{cat_id}">')
             else:
-                lines.append(f'            <h2>{heading_text}</h2>')
+                lines.append('          <div class="service-category">')
+
+            lines.append(f'            <h2><i class="{cat_icon}"></i> {heading_text}</h2>')
+            in_category = True
         elif b.startswith('- '):
             lines.append('            <ul>')
             for item in b.split('\n'):
@@ -151,16 +152,29 @@ def render_article_html(desc_text):
                 if not item:
                     continue
                 val = re.sub(r'^\s*-\s*', '', item)
+                val = val.replace('\u2013', '–').replace('\u2014', '–')
                 lines.append(f'              <li>{val}</li>')
             lines.append('            </ul>')
         else:
-            # Paragraph or bold summary
+            indent = '            ' if in_category else '          '
             if b.startswith('**') and b.endswith('**'):
-                bold_content = b[2:-2].strip()
-                lines.append(f'            <p><strong>{bold_content}</strong></p>')
+                bold_content = b[2:-2].strip().replace('\u2013', '–').replace('\u2014', '–')
+                lines.append(f'{indent}<p><strong>{bold_content}</strong></p>')
             else:
-                clean_p = ' '.join(b.split())
-                lines.append(f'            <p>{clean_p}</p>')
+                clean_p = ' '.join(b.split()).replace('\u2013', '–').replace('\u2014', '–')
+                lines.append(f'{indent}<p>{clean_p}</p>')
+
+    if in_category:
+        lines.append('          </div>')
+        lines.append('')
+
+    # Article Call to Action
+    lines.append('          <!-- Article CTA -->')
+    lines.append('          <div class="port-article-cta">')
+    lines.append(f'            <h3>Need Supply at {clean_port}?</h3>')
+    lines.append('            <p>Send us your complete vessel requisition and our team will respond with a competitive quotation.</p>')
+    lines.append('            <a href="../request-quote.html" class="btn btn-fill">Request a Quote <i class="fas fa-arrow-right"></i></a>')
+    lines.append('          </div>')
 
     return '\n'.join(lines)
 
@@ -176,7 +190,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     content="__META_DESC__">
   <meta name="keywords"
     content="__KEYWORDS__">
-  <meta name="author" content="SHIP CHANDLER MISURATA PORT CO., LTD">
+  <meta name="author" content="SHIP CHANDLER GEORGIA CO., LTD">
 
   <link rel="canonical" href="__CANONICAL_URL__">
 
@@ -186,31 +200,31 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <meta property="og:description"
     content="__META_DESC__">
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Ship Chandler Misurata">
-  <meta property="og:image" content="https://shipchandlermisurata.com/assets/imgs/bg-hero.jpg">
+  <meta property="og:site_name" content="Ship Chandler Georgia">
+  <meta property="og:image" content="https://shipchandlergeorgia.com/assets/imgs/port-hero.jpg">
 
   <!-- Twitter Meta Tags -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="__META_TITLE__">
-  <meta name="twitter:description" content="__META_DESC__">
-  <meta name="twitter:image" content="https://shipchandlermisurata.com/assets/imgs/bg-hero.jpg">
+  <meta name="twitter:description"
+    content="__META_DESC__">
+  <meta name="twitter:image" content="https://shipchandlergeorgia.com/assets/imgs/port-hero.jpg">
 
   <!-- Structured Data (JSON-LD) -->
   <script type="application/ld+json">
 __SCHEMA_JSON__
   </script>
 
-  <!-- Google Fonts -->
+  <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Karla:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Instrument+Sans:wght@400;500;600;700&display=swap"
     rel="stylesheet">
 
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <!-- Favicon -->
   <link rel="icon" type="image/png" href="../favicon.png">
   <link rel="shortcut icon" href="../favicon.ico">
   <link rel="apple-touch-icon" href="../assets/imgs/logo.png">
@@ -221,34 +235,34 @@ __SCHEMA_JSON__
 
 <body>
 
-  <!-- HEADER / NAVBAR -->
-  <header class="site-header" id="site-header">
-    <div class="container header-inner">
-      <a class="logo" href="../index.html">
-        <img src="../assets/imgs/logo.png" alt="Ship Chandler Misurata Logo" width="50" height="50">
-        <span class="logo-text">
+  <!-- HEADER -->
+  <header class="masthead" id="masthead">
+    <div class="wrap masthead-inner">
+      <a class="brand" href="../index.html">
+        <img src="../assets/imgs/logo.png" alt="Ship Chandler Georgia Logo" width="46" height="46">
+        <span class="brand-copy">
           <strong>ShipChandler</strong>
-          <span>Misurata</span>
+          <span>Georgia</span>
         </span>
       </a>
 
-      <button class="nav-toggle" type="button" aria-label="Toggle navigation">
+      <button class="burger" type="button" aria-label="Toggle navigation">
         <span></span><span></span><span></span>
       </button>
 
-      <nav class="primary-nav" id="primary-nav">
-        <ul class="nav-list">
-          <li class="nav-item"><a class="nav-link" href="../index.html">Home</a></li>
-          <li class="nav-item"><a class="nav-link" href="../about.html">About</a></li>
+      <nav class="nav-shell" id="navShell">
+        <ul class="nav-set">
+          <li class="nav-unit"><a class="nav-anchor" href="../index.html">Home</a></li>
+          <li class="nav-unit"><a class="nav-anchor" href="../about.html">About</a></li>
 
-          <!-- Services Dropdown -->
-          <li class="nav-item has-dropdown">
-            <a class="nav-link" href="../services.html">Services <span class="nav-arrow"><svg
-                  viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <!-- Services flyout -->
+          <li class="nav-unit has-flyout">
+            <a class="nav-anchor" href="../services.html">Services <span class="caret"><svg viewBox="0 0 24 24"
+                  width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                  stroke-linejoin="round">
                   <polyline points="6 9 12 15 18 9"></polyline>
                 </svg></span></a>
-            <div class="dropdown-menu">
+            <div class="flyout">
               <a href="../services.html#provisions">Food Provisions Supply</a>
               <a href="../services.html#bonded">Bonded Stores</a>
               <a href="../services.html#deck">Deck Stores</a>
@@ -265,31 +279,30 @@ __SCHEMA_JSON__
             </div>
           </li>
 
-          <!-- Ports Mega Menu -->
-          <li class="nav-item has-mega">
-            <a class="nav-link" href="javascript:void(0)">Ports <span class="nav-arrow"><svg
-                  viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
-                  stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <!-- Ports mega -->
+          <li class="nav-unit has-mega">
+            <a class="nav-anchor" href="javascript:void(0)" id="navPorts">Ports <span class="caret"><svg
+                  viewBox="0 0 24 24" width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round">
                   <polyline points="6 9 12 15 18 9"></polyline>
                 </svg></span></a>
-            <div class="mega-menu">
-              <div class="mega-header">
-                <div class="mega-header-title">Global Port Network</div>
-                <div class="mega-search">
-                  <i class="fas fa-search" style="color:var(--text-gray);"></i>
-                  <input type="text" id="mega-port-search" placeholder="Search 49 ports...">
+            <div class="mega" id="megaPortsMenu">
+              <div class="mega-top">
+                <h4>Global Port Network</h4>
+                <div class="mega-filter">
+                  <i class="fas fa-search" style="color:var(--steel);font-size:0.8rem;"></i>
+                  <input type="text" id="portSearch" placeholder="Search 49 ports...">
                 </div>
               </div>
-              <div class="mega-grid" id="mega-port-list">
-                <!-- Populated via JS -->
+              <div class="mega-cols" id="megaPorts">
+                <!-- populated via JS -->
               </div>
             </div>
           </li>
 
-          <li class="nav-item"><a class="nav-link" href="../contact.html">Contact</a></li>
+          <li class="nav-unit"><a class="nav-anchor" href="../contact.html">Contact</a></li>
         </ul>
-        <a class="btn btn-primary" style="padding: 12px 28px; font-size: 0.95rem;" href="../request-quote.html">Get
-          Quote</a>
+        <a class="btn btn-fill" style="padding:10px 22px;font-size:0.78rem;" href="../request-quote.html">Get Quote</a>
       </nav>
     </div>
   </header>
@@ -297,119 +310,85 @@ __SCHEMA_JSON__
   <main>
     <!-- PORT HERO -->
     <section class="port-hero">
-      <img class="port-hero-bg" src="../assets/imgs/bg-hero.jpg" alt="__HERO_ALT__">
-      <div class="port-hero-overlay"></div>
+      <img class="port-hero-bg" src="../assets/imgs/port-hero.jpg" alt="__HERO_ALT__">
+      <div class="port-hero-scrim"></div>
 
-      <div class="port-hero-container">
-        <div class="port-hero-content">
-          <ul class="port-breadcrumb">
-            <li><a href="../index.html">Home</a></li>
-            <li><span>/</span></li>
-            <li><a href="../index.html#ports">Ports</a></li>
-            <li><span>/</span></li>
-            <li>__PAGE_NAME__</li>
-          </ul>
-          <span class="eyebrow" style="color: var(--primary-light);">Port Supply Profile</span>
-          <h1 class="port-hero-title">__HERO_TITLE__</h1>
-          <p class="port-hero-desc">__META_DESC__</p>
+      <div class="wrap port-hero-inner">
+        <div class="port-hero-copy">
+          <div class="breadcrumb">
+            <a href="../index.html">Home</a>
+            <span>/</span>
+            <a href="../index.html#ports">Ports</a>
+            <span>/</span>
+            <span>__PAGE_NAME__</span>
+          </div>
+          <span class="kicker" style="color: var(--red);">Port Supply Profile</span>
+          <h1>__HERO_TITLE__</h1>
+          <p>__META_DESC__</p>
         </div>
 
-        <div class="port-hero-badge">
-          <div class="port-hero-card">
-            <i class="fas fa-ship"></i>
-            <div>
-              <strong>Vessel Supply</strong>
-              <span>Port, terminals & anchorage</span>
-            </div>
-          </div>
-          <div class="port-hero-card">
-            <i class="fas fa-clock"></i>
-            <div>
-              <strong>24/7 Operations</strong>
-              <span>On-time dockside delivery</span>
-            </div>
-          </div>
-          <div class="port-hero-card">
-            <i class="fas fa-certificate"></i>
-            <div>
-              <strong>IMPA & ISSA Quality</strong>
-              <span>Certified marine supplies</span>
-            </div>
-          </div>
-        </div>
+
       </div>
     </section>
 
-    <!-- PORT ARTICLE SECTION WITH STICKY SIDEBAR -->
+    <!-- PORT ARTICLE SECTION (NEW TABBED LAYOUT) -->
     <section class="port-article-section">
-      <div class="container">
-        <div class="port-article-layout">
 
-          <!-- Sticky Sidebar 'On This Page' -->
-          <aside class="port-toc-sidebar">
-            <h3>On This Page</h3>
-            <nav class="port-toc-list">
-              <a href="#professional-services">Professional Ship Supply</a>
-              <a href="#provisions">Ship Provisions Supply</a>
-              <a href="#bonded">Bonded Stores & Crew Welfare</a>
-              <a href="#deck">Deck Stores Supply</a>
-              <a href="#engine">Engine Stores Supply</a>
-              <a href="#cabin">Cabin & Galley Stores</a>
-              <a href="#safety">Safety Equipment & PPE</a>
-              <a href="#electrical">Electrical Stores</a>
-              <a href="#chemicals">Marine Chemicals</a>
-              <a href="#welding">Welding Equipment</a>
-              <a href="#spare-parts">Spare Parts & Technical</a>
-              <a href="#publications">Nautical Charts</a>
-              <a href="#tools">Tools & Hardware</a>
-              <a href="#technical-support">Technical & Repair Support</a>
-              <a href="#urgent">Urgent Ship Supply</a>
-              <a href="#vessels">Vessels Supported</a>
-              <a href="#rfq">How to Send an RFQ</a>
-              <a href="#why-choose">Why Choose Us</a>
-            </nav>
-            <div class="port-toc-cta">
-              <a href="../request-quote.html" class="btn btn-primary">Request a Quote <i class="fas fa-arrow-right"></i></a>
-            </div>
-          </aside>
-
-          <!-- Main Port Article Content -->
-          <article class="port-article-content">
-__RENDERED_ARTICLE__
-
-            <!-- Article CTA -->
-            <div class="port-article-cta">
-              <h3>Need Supply at __CLEAN_PORT__?</h3>
-              <p>Send us your complete vessel requisition and our team will respond with a competitive quotation.</p>
-              <a href="../request-quote.html" class="btn btn-primary">Request a Quote <i
-                  class="fas fa-arrow-right"></i></a>
-            </div>
-          </article>
+      <!-- Sticky Horizontal TOC -->
+      <div class="port-toc-bar-wrap">
+        <div class="wrap">
+          <div class="port-toc-bar">
+            <a href="#professional-services">Overview</a>
+            <a href="#provisions">Provisions</a>
+            <a href="#bonded">Bonded Stores</a>
+            <a href="#deck">Deck Stores</a>
+            <a href="#engine">Engine Stores</a>
+            <a href="#cabin">Cabin & Galley</a>
+            <a href="#safety">Safety & PPE</a>
+            <a href="#electrical">Electrical</a>
+            <a href="#chemicals">Chemicals</a>
+            <a href="#welding">Welding</a>
+            <a href="#spare-parts">Spare Parts</a>
+            <a href="#publications">Publications</a>
+            <a href="#tools">Tools</a>
+            <a href="#technical-support">Tech Support</a>
+            <a href="#urgent">Urgent</a>
+            <a href="#vessels">Vessels</a>
+            <a href="#rfq">RFQ</a>
+            <a href="#why-choose">Why Us</a>
+          </div>
         </div>
+      </div>
+
+      <div class="wrap port-article-layout">
+        <article class="port-article-content">
+__RENDERED_ARTICLE__
+        </article>
       </div>
     </section>
   </main>
 
   <!-- FOOTER -->
-  <footer class="site-footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a class="logo" href="../index.html">
-            <img src="../assets/imgs/logo.png" alt="Logo" width="50" height="50"
-              style="border-radius: 10px; background:#fff; padding:4px;">
-            <span class="logo-text">
+  <footer class="foot">
+    <div class="wrap">
+      <div class="foot-top">
+        <div class="foot-brand">
+          <a class="brand" href="../index.html">
+            <img src="../assets/imgs/logo.png" alt="Logo" width="46" height="46"
+              style="border-radius:8px;background:#fff;padding:3px;border:1px solid rgba(255,255,255,0.1);">
+            <span class="brand-copy">
               <strong>ShipChandler</strong>
-              <span style="color: var(--primary);">Misurata</span>
+              <span>Georgia</span>
             </span>
           </a>
-          <p>SHIP CHANDLER MISURATA PORT CO., LTD is a licensed marine supplier providing food provisions, food stores,
-            bond store supply, and emergency vessel supply services across the Port of Misurata, Libya.</p>
+          <p>SHIP CHANDLER GEORGIA CO., LTD is a licensed marine supplier providing food provisions,
+            food stores, bond store supply, and emergency vessel supply services across the
+            Port of Poti, Georgia.</p>
         </div>
 
-        <div class="footer-col">
+        <div class="foot-col">
           <h4>Quick Links</h4>
-          <ul class="footer-links">
+          <ul class="foot-links">
             <li><a href="../index.html">Home</a></li>
             <li><a href="../about.html">About Us</a></li>
             <li><a href="../services.html">Services</a></li>
@@ -418,9 +397,9 @@ __RENDERED_ARTICLE__
           </ul>
         </div>
 
-        <div class="footer-col">
+        <div class="foot-col">
           <h4>Services</h4>
-          <ul class="footer-links">
+          <ul class="foot-links">
             <li><a href="../services.html#provisions">Provisions Supply</a></li>
             <li><a href="../services.html#bonded">Bonded Stores</a></li>
             <li><a href="../services.html#deck">Deck Stores</a></li>
@@ -429,190 +408,78 @@ __RENDERED_ARTICLE__
           </ul>
         </div>
 
-        <div class="footer-col">
+        <div class="foot-col">
           <h4>Contact Us</h4>
-          <ul class="footer-contact">
-            <li><i class="fas fa-map-marker-alt"></i> Misurata Seaport, Qasr Ahmed, Misurata, Libya</li>
-            <li><i class="fas fa-envelope"></i> <a href="mailto:sales@shipchandlermisurata.com"
-                style="color:inherit;">sales@shipchandlermisurata.com</a></li>
-            <li><i class="fas fa-user-tie"></i> Ahmed Al-Misrati</li>
+          <ul class="foot-contact">
+            <li><i class="fas fa-map-marker-alt"></i> Port of Poti, 52 David Aghmashenebeli Street, 4400 Poti, Georgia
+            </li>
+            <li><i class="fas fa-envelope"></i> <a href="mailto:sales@shipchandlergeorgia.com"
+                style="color:inherit;">sales@shipchandlergeorgia.com</a></li>
+            <li><i class="fas fa-user-tie"></i> Giorgi Beridze</li>
             <li>
-              <a class="hero-whatsapp-bar" href="https://wa.me/2482743244" target="_blank" rel="noopener noreferrer"
-                aria-label="Direct WhatsApp contact (+248) 2 743 244">
-                <span class="hero-whatsapp-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <a class="foot-wa" href="https://wa.me/6590190005" target="_blank" rel="noopener noreferrer"
+                aria-label="Direct WhatsApp contact (+65) 9019 0005">
+                <span class="foot-wa-ico" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
                     <path
                       d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
                   </svg>
                 </span>
-                <span class="hero-whatsapp-tag">WhatsApp:</span>
-                <span class="hero-whatsapp-num" style="color: var(--primary);">(+248) 2 743 244</span>
-                <span class="hero-whatsapp-arrow" style="color: var(--primary);" aria-hidden="true">&rarr;</span>
+                <span class="foot-wa-tag">WhatsApp:</span>
+                <span class="foot-wa-num">(+65) 9019 0005</span>
+                <span class="foot-wa-arr" aria-hidden="true">&rarr;</span>
               </a>
             </li>
           </ul>
         </div>
       </div>
 
-      <div class="footer-bottom">
-        <div>&copy; 2026 SHIP CHANDLER MISURATA PORT CO., LTD. All rights reserved.</div>
+      <div class="foot-bottom">
+        <div>&copy; 2026 SHIP CHANDLER GEORGIA CO., LTD. All rights reserved.</div>
       </div>
     </div>
   </footer>
 
   <!-- FLOATING WHATSAPP -->
-  <a href="https://wa.me/2482743244" class="whatsapp-float" target="_blank" rel="noopener noreferrer"
-    aria-label="WhatsApp Contact +248 2 743 244">
+  <a href="https://wa.me/6590190005" class="wa-float" target="_blank" rel="noopener noreferrer"
+    aria-label="WhatsApp Contact (+65) 9019 0005">
     <i class="fab fa-whatsapp"></i>
   </a>
 
-  <script>
-    // --- Port List Data for Dropdown (49 Ports) ---
-    const ports = [
-      "Ship Chandler Dar Es Salaam", "Ship Chandler Apapa", "Ship Chandler Onne Port Nigeria", "San Pedro Ship Supply Chandler",
-      "Ship Chandler Abidjan", "Ship Chandler Freetown", "Monrovia Ship Chandler", "Ship Chandler Maputo", "Ship Chandler Matadi",
-      "Ship Chandler Beira", "Ship Chandler Angola", "Ship Chandler Lobito", "ShipChandler Lome", "Shipchandler Lome",
-      "Ivory Coast Ship Chandler", "Nouadhibou Ship Chandler", "Ship Chandler Luanda", "Ship Chandler Cape Verde",
-      "Ship Chandler Gabon", "Ship Chandler Namibia", "Walvis Bay Ship Chandler", "Ship Chandler Gentil Port - Gabon",
-      "Ship Chandler Takoradi", "Ship Chandler Congo", "Shipchandler Lagos", "Ship Chandler Port Ambon",
-      "Shipchandler Pointe Noire", "Ship Chandler Djibouti", "Ship Chandler Cabinda", "Ship Chandler Tema",
-      "Ship Chandler Mindelo", "Ship Chandler Casablanca", "Ship Chandler Safi Port Morocco", "Ship Chandler Kamsar",
-      "Ship Chandler Soyo", "Dakar Ship Chandler", "Ship Chandler Senegal", "Ship Chandler Dakar", "Bissau Ship Chandler - Guinea",
-      "Conakry Ship Chandler", "Ship Chandler Cotonou", "Douala Ship Chandler", "Liberia Ship Chandler", "Namibia Ship Chandler",
-      "Ship Chandler Dakar", "Ship Chandler Mombasa", "Ship Chandlers Saldanha Bay", "Ship Chandler Owendo", "Ship Chandlers Richards Bay"
-    ];
-
-    // Populate Mega Menu
-    const megaList = document.getElementById('mega-port-list');
-    if (megaList) {
-      const third = Math.ceil(ports.length / 3);
-      const col1 = ports.slice(0, third);
-      const col2 = ports.slice(third, third * 2);
-      const col3 = ports.slice(third * 2);
-
-      function createPortGroup(title, items) {
-        const group = document.createElement('div');
-        group.className = 'mega-group';
-        group.innerHTML = `<h4>${title}</h4>`;
-        items.forEach(port => {
-          const a = document.createElement('a');
-          a.href = `${port.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.html`;
-          a.textContent = port;
-          group.appendChild(a);
-        });
-        return group;
-      }
-
-      megaList.appendChild(createPortGroup('African Ports (A-D)', col1));
-      megaList.appendChild(createPortGroup('African Ports (E-M)', col2));
-      megaList.appendChild(createPortGroup('African Ports (N-Z)', col3));
-
-      // Mega Menu Search
-      const searchInput = document.getElementById('mega-port-search');
-      if (searchInput) {
-        searchInput.addEventListener('input', function (e) {
-          const query = e.target.value.toLowerCase();
-          const allLinks = megaList.querySelectorAll('a');
-          const groups = megaList.querySelectorAll('.mega-group');
-
-          allLinks.forEach(link => {
-            const text = link.textContent.toLowerCase();
-            link.style.display = text.includes(query) ? 'block' : 'none';
-          });
-
-          groups.forEach(group => {
-            const hasVisible = Array.from(group.querySelectorAll('a')).some(a => a.style.display !== 'none');
-            group.style.display = hasVisible ? 'block' : 'none';
-          });
-        });
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', function () {
-      // --- Sticky Header Effect ---
-      const header = document.querySelector('.site-header');
-      window.addEventListener('scroll', () => {
-        if (window.scrollY > 20) {
-          header.classList.add('scrolled');
-        } else {
-          header.classList.remove('scrolled');
-        }
-      });
-
-      // --- Mobile Nav Toggle ---
-      const navToggle = document.querySelector('.nav-toggle');
-      const primaryNav = document.querySelector('.primary-nav');
-
-      navToggle.addEventListener('click', function () {
-        primaryNav.classList.toggle('open');
-        this.classList.toggle('open');
-        header.classList.toggle('menu-open');
-      });
-
-      // --- Mobile Dropdown Toggles ---
-      const dropdownItems = document.querySelectorAll('.nav-item.has-dropdown, .nav-item.has-mega');
-      dropdownItems.forEach(item => {
-        const link = item.querySelector('.nav-link');
-        link.addEventListener('click', function (e) {
-          if (window.innerWidth <= 1024) {
-            e.preventDefault();
-            item.classList.toggle('open');
-          }
-        });
-      });
-
-      // --- Smooth scroll for sidebar TOC ---
-      document.querySelectorAll('.port-toc-list a').forEach(link => {
-        link.addEventListener('click', function (e) {
-          e.preventDefault();
-          const target = document.querySelector(this.getAttribute('href'));
-          if (target) {
-            const offset = 100;
-            const top = target.getBoundingClientRect().top + window.pageYOffset - offset;
-            window.scrollTo({ top, behavior: 'smooth' });
-          }
-        });
-      });
-
-      // --- Scroll Reveal Animation ---
-      const revealElements = document.querySelectorAll('.reveal');
-      const revealObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('active');
-            revealObserver.unobserve(entry.target);
-          }
-        });
-      }, {
-        threshold: 0.15,
-        rootMargin: '0px 0px -50px 0px'
-      });
-
-      revealElements.forEach(el => revealObserver.observe(el));
-    });
-  </script>
+  <!-- Centralized Port Pages JavaScript -->
+  <script src="../assets/js/port-pages.js"></script>
 </body>
 
 </html>"""
 
 
+def escape_meta(val):
+    """
+    Safely prepares text for meta tags and attributes by escaping double quotes,
+    without converting '&' to '&amp;' so title and descriptions remain clean and natural.
+    """
+    if val is None:
+        return ""
+    return str(val).strip().replace('"', '&quot;')
+
+
 def generate_page_html(page_name, h1, meta_title, meta_desc, full_desc, slug):
     """
     Constructs complete HTML for a port page matching the exact Bissau structure,
-    centralized CSS, Misurata theme, SEO tags, schema markup, and clean footer (no drinks/snacks).
+    centralized CSS, Georgia theme, SEO tags, and schema markup.
     """
     clean_port = get_clean_port_name(page_name)
     hero_title_html = format_hero_title(h1, page_name)
-    rendered_article = render_article_html(full_desc)
+    rendered_article = render_article_html(full_desc, clean_port)
 
-    canonical_url = f"https://shipchandlermisurata.com/ports/{slug}"
-    escaped_desc = html.escape(str(meta_desc).strip())
-    escaped_title = html.escape(str(meta_title).strip())
-    escaped_name = html.escape(str(page_name).strip())
-    escaped_h1 = html.escape(str(h1).strip())
+    canonical_url = f"https://shipchandlergeorgia.com/ports/{slug}"
+    escaped_desc = escape_meta(meta_desc)
+    escaped_title = escape_meta(meta_title)
+    escaped_name = escape_meta(page_name)
+    escaped_h1 = escape_meta(h1)
     keywords = f"{escaped_name}, ship chandler, ship supply, provisions, marine stores, bonded stores, deck stores, engine stores, vessel supply, marine procurement"
 
-    # Build Schema.org JSON-LD structured data
+    # Schema.org JSON-LD
     schema_data = {
         "@context": "https://schema.org",
         "@type": "WebPage",
@@ -626,13 +493,13 @@ def generate_page_html(page_name, h1, meta_title, meta_desc, full_desc, slug):
                     "@type": "ListItem",
                     "position": 1,
                     "name": "Home",
-                    "item": "https://shipchandlermisurata.com/"
+                    "item": "https://shipchandlergeorgia.com/"
                 },
                 {
                     "@type": "ListItem",
                     "position": 2,
                     "name": "Ports",
-                    "item": "https://shipchandlermisurata.com/#ports"
+                    "item": "https://shipchandlergeorgia.com/#ports"
                 },
                 {
                     "@type": "ListItem",
@@ -655,7 +522,6 @@ def generate_page_html(page_name, h1, meta_title, meta_desc, full_desc, slug):
     page_html = page_html.replace("__PAGE_NAME__", escaped_name)
     page_html = page_html.replace("__HERO_TITLE__", hero_title_html)
     page_html = page_html.replace("__RENDERED_ARTICLE__", rendered_article)
-    page_html = page_html.replace("__CLEAN_PORT__", clean_port)
 
     return page_html
 
@@ -665,8 +531,7 @@ def main():
     wb = openpyxl.load_workbook(EXCEL_PATH, data_only=True)
     sheet = wb['SEO Pages']
 
-    # Step 1: Ensure CSS is centralized
-    extract_and_centralize_css()
+    ensure_hero_image()
 
     rows = list(sheet.iter_rows(values_only=True))[1:]  # Skip header row
     print(f"Found {len(rows)} port rows in Excel.")
@@ -702,6 +567,8 @@ def main():
     print("\n" + "=" * 60)
     print(f"SUCCESS: Processed {generated_count} rows across {unique_files} unique port page files.")
     print(f"Centralized CSS written to: {CSS_FILE}")
+    print(f"Centralized JS written to:  {JS_FILE}")
+    print(f"Standardized hero image:    assets/imgs/{HERO_IMG_NAME}")
     print("=" * 60)
 
 

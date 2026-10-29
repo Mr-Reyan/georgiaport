@@ -1549,7 +1549,7 @@
     <main>
         <!-- SERVICES HERO -->
         <section class="services-hero">
-            <img class="services-hero-bg" src="assets/imgs/bg-hero.jpg" alt="Services Background">
+            <img class="services-hero-bg" src="assets/imgs/port-hero.jpg" alt="Services Background">
             <div class="services-hero-scrim"></div>
 
             <div class="wrap services-hero-inner">
@@ -1593,31 +1593,10 @@
                     <p>Georgia is a transcontinental country located at the intersection of Eastern Europe and Western
                         Asia. It is situated on the eastern shore of the Black Sea, bordered by Russia to the north and
                         northeast, Turkey to the south, and Armenia and Azerbaijan to the southeast.</p>
-                    <p>Georgia is famous for its ancient wine-making tradition, stunning mountainous landscapes
-                        (including the Caucasus Mountains), and its strategic location as a key transit corridor for
-                        trade between Europe and Asia. Its Black Sea ports are vital for regional logistics, energy
-                        transit, and international shipping.</p>
-                    <div class="geo-stats">
-                        <div class="geo-stat">
-                            <strong>Black Sea</strong>
-                            <span>Strategic Eastern Shore Location</span>
-                        </div>
-                        <div class="geo-stat">
-                            <strong>3,000+ Years</strong>
-                            <span>Winemaking History</span>
-                        </div>
-                        <div class="geo-stat">
-                            <strong>3 Major</strong>
-                            <span>Commercial Ports Served</span>
-                        </div>
-                        <div class="geo-stat">
-                            <strong>Euro-Asia</strong>
-                            <span>Trade Corridor</span>
-                        </div>
-                    </div>
+
                 </div>
                 <div class="geo-visual rise" style="transition-delay:0.1s;">
-                    <img src="assets/imgs/ships-main-page.jpg" alt="Georgia Maritime">
+                    <img src="assets/imgs/georgia-sunset-ship.jpeg" alt="Georgia Maritime">
                 </div>
             </div>
         </section>
@@ -1714,7 +1693,7 @@
                     <!-- 02 Bonded -->
                     <div class="service-item rise" id="bonded">
                         <div class="service-item-img">
-                            <img src="assets/imgs/services/bonded-stores.webp" alt="Bonded Stores">
+                            <img src="assets/imgs/services/bonded.jpg" alt="Bonded Stores">
                         </div>
                         <div class="service-item-body">
                             <h3><span class="service-num">02</span> Bonded Stores</h3>
@@ -1786,7 +1765,7 @@
                     <!-- 05 Cabin -->
                     <div class="service-item rise" id="cabin">
                         <div class="service-item-img">
-                            <img src="assets/imgs/services/service-cabin.avif" alt="Cabin & Galley Stores">
+                            <img src="assets/imgs/services/service-cabin.jpg" alt="Cabin & Galley Stores">
                         </div>
                         <div class="service-item-body">
                             <h3><span class="service-num">05</span> Cabin & Galley Stores</h3>
@@ -1858,7 +1837,7 @@
                     <!-- 08 Chemicals -->
                     <div class="service-item rise" id="chemicals">
                         <div class="service-item-img">
-                            <img src="assets/imgs/services/service-chemicals.avif" alt="Marine Chemicals">
+                            <img src="assets/imgs/services/marine.jpg" alt="Marine Chemicals">
                         </div>
                         <div class="service-item-body">
                             <h3><span class="service-num">08</span> Marine Chemicals</h3>
@@ -1930,7 +1909,7 @@
                     <!-- 11 Publications -->
                     <div class="service-item rise" id="publications">
                         <div class="service-item-img">
-                            <img src="assets/imgs/services/service-nautical.avif" alt="Nautical Charts">
+                            <img src="assets/imgs/services/nautical.jpg" alt="Nautical Charts">
                         </div>
                         <div class="service-item-body">
                             <h3><span class="service-num">11</span> Nautical Charts</h3>
@@ -2176,25 +2155,32 @@
 
             risers.forEach(el => io.observe(el));
 
-            /* TOC Active Link Highlighting */
+            /* TOC Active Link Highlighting (Fixed Scroll Logic) */
             const tocLinks = document.querySelectorAll('.toc-link');
             const serviceItems = document.querySelectorAll('.service-item');
 
             window.addEventListener('scroll', () => {
                 let current = '';
-                const scrollPos = window.scrollY + 120; // offset for sticky header
+                // We use an offset of 150px to account for the fixed header + some padding
+                const scrollPos = window.scrollY + 150;
 
                 serviceItems.forEach(item => {
                     const top = item.offsetTop;
-                    const height = item.offsetHeight;
-                    if (scrollPos >= top && scrollPos < top + height) {
+                    // If the top of the section is above our scroll position, it's the current one
+                    if (scrollPos >= top) {
                         current = item.getAttribute('id');
                     }
                 });
 
+                // Fallback: If we haven't scrolled to the first item yet, set it to the first item
+                if (!current && serviceItems.length > 0) {
+                    current = serviceItems[0].getAttribute('id');
+                }
+
                 tocLinks.forEach(link => {
                     link.classList.remove('active');
-                    if (link.getAttribute('href').includes(current)) {
+                    // Using exact match on href to avoid string inclusion bugs
+                    if (link.getAttribute('href') === `#${current}`) {
                         link.classList.add('active');
                     }
                 });
